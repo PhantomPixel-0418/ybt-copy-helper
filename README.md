@@ -190,20 +190,6 @@ copyBtn.style.cssText = `
 
 **注意**：每次推送到主分支都会自动构建，您可以在 Actions 页面查看构建状态和下载构建文件。
 
-## 发布流程
-
-### GitHub Releases（稳定版）
-
-1. 创建版本标签：`git tag v1.0.0`
-2. 推送标签：`git push origin v1.0.0`
-3. 在 GitHub Releases 页面编辑发布说明
-
-### GitHub Actions（开发版）
-
-1. 推送代码到主分支
-2. 自动触发构建工作流
-3. 在 Actions 页面下载最新构建
-
 ### Edge 商店（待发布）
 
 *即将在 Microsoft Edge Add-ons 商店发布*

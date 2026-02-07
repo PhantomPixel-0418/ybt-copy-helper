@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "信息学奥赛一本通样例复制助手",
-    "version": "1.0",
+    "version": "1.0.0",
     "description": "快速复制ybt.ssoier.cn题目的输入/输出样例，支持所有题目页面，同时支持复制提示中额外的样例。",
     "icons": {
         "16": "icon.png",
