@@ -1,0 +1,36 @@
+{
+    "manifest_version": 3,
+    "name": "信息学奥赛一本通样例复制助手",
+    "version": "1.0",
+    "description": "快速复制ybt.ssoier.cn题目的输入/输出样例，支持所有题目页面，同时支持复制提示中额外的样例。",
+    "icons": {
+        "16": "icon.png",
+        "48": "icon.png",
+        "128": "icon.png"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "http://ybt.ssoier.cn:8088/problem_show.php*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "run_at": "document_end",
+            "all_frames": true
+        }
+    ],
+    "permissions": [
+        "clipboardWrite"
+    ],
+    "web_accessible_resources": [
+        {
+            "resources": [
+                "icon.png"
+            ],
+            "matches": [
+                "http://ybt.ssoier.cn/*"
+            ]
+        }
+    ]
+}

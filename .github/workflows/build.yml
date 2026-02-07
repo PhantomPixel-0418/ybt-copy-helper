@@ -1,0 +1,153 @@
+name: 构建浏览器扩展
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: 获取构建信息
+      id: build-info
+      run: |
+        # 获取提交信息
+        COMMIT_SHA_SHORT=$(git rev-parse --short HEAD)
+        BRANCH_NAME=${GITHUB_REF#refs/heads/}
+        
+        # 生成版本号（基于时间戳）
+        BUILD_TIME=$(date +%Y%m%d%H%M%S)
+        BUILD_VERSION="nightly-${BUILD_TIME}-${COMMIT_SHA_SHORT}"
+        
+        echo "COMMIT_SHA=${COMMIT_SHA_SHORT}" >> $GITHUB_OUTPUT
+        echo "BRANCH_NAME=${BRANCH_NAME}" >> $GITHUB_OUTPUT
+        echo "BUILD_VERSION=${BUILD_VERSION}" >> $GITHUB_OUTPUT
+        
+        # 更新manifest.json中的版本号
+        sed -i "s/\"version\": *\"[^\"]*\"/\"version\": \"${BUILD_VERSION}\"/" manifest.json
+        echo "构建版本号: ${BUILD_VERSION}"
+    
+    - name: 验证扩展文件
+      run: |
+        echo "验证扩展文件结构..."
+        
+        # 检查必需文件
+        REQUIRED_FILES=("manifest.json" "content.js" "icon.png")
+        for file in "${REQUIRED_FILES[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ 错误: 缺少必需文件: $file"
+            exit 1
+          fi
+          echo "✅ 文件存在: $file"
+        done
+        
+        # 验证manifest.json格式
+        if ! jq . manifest.json > /dev/null 2>&1; then
+          echo "❌ 错误: manifest.json格式错误"
+          exit 1
+        fi
+        
+        echo "✅ 所有文件验证通过"
+    
+    - name: 创建构建目录
+      run: |
+        echo "创建构建目录..."
+        BUILD_DIR="ybt-copy-helper-${{ steps.build-info.outputs.BUILD_VERSION }}"
+        mkdir -p "dist/$BUILD_DIR"
+        
+        # 复制必需文件
+        cp manifest.json "dist/$BUILD_DIR/"
+        cp content.js "dist/$BUILD_DIR/"
+        cp icon.png "dist/$BUILD_DIR/"
+        cp README.md "dist/$BUILD_DIR/" 2>/dev/null || true
+        cp LICENSE "dist/$BUILD_DIR/" 2>/dev/null || true
+        
+        # 如果有其他文件
+        if [ -d "assets" ]; then
+          cp -r assets "dist/$BUILD_DIR/"
+        fi
+    
+    - name: 创建ZIP包
+      run: |
+        cd dist
+        ZIP_NAME="ybt-copy-helper-${{ steps.build-info.outputs.BUILD_VERSION }}.zip"
+        
+        echo "创建ZIP包: $ZIP_NAME"
+        zip -r "$ZIP_NAME" "ybt-copy-helper-${{ steps.build-info.outputs.BUILD_VERSION }}"
+        
+        # 记录文件大小
+        FILE_SIZE=$(stat -c%s "$ZIP_NAME")
+        echo "ZIP文件大小: $((FILE_SIZE / 1024))KB"
+        
+        echo "ZIP_PATH=$(pwd)/$ZIP_NAME" >> $GITHUB_ENV
+        echo "ZIP_NAME=$ZIP_NAME" >> $GITHUB_ENV
+    
+    - name: 创建CRX包（可选）
+      run: |
+        echo "注意：CRX包需要签名密钥"
+        echo "如需创建CRX包，请参考以下步骤："
+        echo "1. 生成私有密钥：openssl genrsa -out key.pem 2048"
+        echo "2. 将密钥添加到GitHub Secrets"
+        echo "3. 使用crx3-pack工具打包"
+        echo ""
+        echo "您可以通过加载已解压的扩展程序来使用ZIP文件"
+    
+    - name: 上传构建产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: ybt-copy-helper-build
+        path: |
+          dist/*.zip
+          dist/ybt-copy-helper-*
+        retention-days: 30
+    
+    - name: 生成构建信息文件
+      run: |
+        echo "生成构建信息..."
+        BUILD_INFO_FILE="dist/build-info.json"
+        
+        cat > "$BUILD_INFO_FILE" << EOF
+        {
+          "version": "${{ steps.build-info.outputs.BUILD_VERSION }}",
+          "commit_sha": "${{ steps.build-info.outputs.COMMIT_SHA }}",
+          "branch": "${{ steps.build-info.outputs.BRANCH_NAME }}",
+          "build_time": "$(date -Iseconds)",
+          "downloads": {
+            "zip": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+            "source": "https://github.com/${{ github.repository }}/tree/${{ steps.build-info.outputs.COMMIT_SHA }}"
+          }
+        }
+        EOF
+        
+        echo "构建信息："
+        cat "$BUILD_INFO_FILE"
+    
+    - name: 上传构建信息
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-info
+        path: dist/build-info.json
+        retention-days: 30
+    
+    - name: 发布到工作流总结
+      run: |
+        echo "## 🚀 构建完成" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**版本**: ${{ steps.build-info.outputs.BUILD_VERSION }}" >> $GITHUB_STEP_SUMMARY
+        echo "**提交**: ${{ steps.build-info.outputs.COMMIT_SHA }}" >> $GITHUB_STEP_SUMMARY
+        echo "**分支**: ${{ steps.build-info.outputs.BRANCH_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 📦 下载链接" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "1. 前往本工作流的 **Artifacts** 部分下载构建文件" >> $GITHUB_STEP_SUMMARY
+        echo "2. 下载后解压ZIP文件" >> $GITHUB_STEP_SUMMARY
+        echo "3. 在浏览器中加载已解压的扩展程序" >> $GITHUB_STEP_SUMMARY
